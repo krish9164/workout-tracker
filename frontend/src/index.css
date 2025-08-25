@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Keep defaults neutral and readable */
+:root {
+  color-scheme: light;
+}
+body {
+  @apply bg-gray-100 text-gray-900;
+}
+a {
+  @apply text-blue-600;
+}
