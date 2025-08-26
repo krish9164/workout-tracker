@@ -5,15 +5,18 @@ import "./index.css";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import NewWorkout from "./pages/NewWorkout";
-import History from "./pages/History";           // add this
-import WorkoutDetail from "./pages/WorkoutDetail"; // and this
+import History from "./pages/History";
+import WorkoutDetail from "./pages/WorkoutDetail";
 import Analytics from "./pages/Analytics";
-
+import AppShell from "./components/AppShell";
+import { initTheme } from "./lib/theme";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem("token");
   return token ? <>{children}</> : <Navigate to="/login" replace />;
 }
+
+initTheme();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -24,7 +27,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           path="/"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <AppShell><Dashboard /></AppShell>
             </ProtectedRoute>
           }
         />
@@ -32,7 +35,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           path="/new-workout"
           element={
             <ProtectedRoute>
-              <NewWorkout />
+              <AppShell><NewWorkout /></AppShell>
             </ProtectedRoute>
           }
         />
@@ -40,15 +43,15 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           path="/history"
           element={
             <ProtectedRoute>
-              <History />
+              <AppShell><History /></AppShell>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/workouts/:id"
+          path="/workout/:id"
           element={
             <ProtectedRoute>
-              <WorkoutDetail />
+              <AppShell><WorkoutDetail /></AppShell>
             </ProtectedRoute>
           }
         />
@@ -56,7 +59,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           path="/analytics"
           element={
             <ProtectedRoute>
-              <Analytics />
+              <AppShell><Analytics /></AppShell>
             </ProtectedRoute>
           }
         />

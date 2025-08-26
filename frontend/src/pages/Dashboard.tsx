@@ -1,3 +1,4 @@
+// src/pages/Dashboard.tsx
 import { useEffect, useState } from "react";
 import { api, clearToken } from "../lib/api";
 
@@ -13,7 +14,6 @@ export default function Dashboard() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load profile + exercises on page load
   useEffect(() => {
     Promise.all([api("/me"), api("/exercises")])
       .then(([meData, exData]) => {
@@ -51,87 +51,86 @@ export default function Dashboard() {
     window.location.href = "/login";
   }
 
-  if (loading) return <div className="p-6 text-gray-800">Loading…</div>;
+  if (loading) return <div className="p-6 text-gray-600">Loading…</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-900">
-      {/* Header */}
-      
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <div className="flex gap-2">
-          <a
-            href="/history"
-            className="rounded px-3 py-2 bg-gray-200 hover:bg-gray-300 transition"
-          >
-            History
-          </a>
-          <a
-            href="/new-workout"
-            className="rounded px-3 py-2 bg-blue-600 text-white hover:bg-blue-700 transition"
-          >
-            + New Workout
-          </a>
-          <a
-            href="/analytics"
-            className="rounded px-3 py-2 bg-green-600 text-white hover:bg-green-700 transition"
-          >
-            Analytics
-          </a>
-          <button
-            onClick={logout}
-            className="rounded px-3 py-2 bg-red-600 text-white hover:bg-red-700 transition"
-          >
-            Logout
-          </button>
+    <div className="space-y-6">
+      {/* Quick actions */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="card p-5">
+          <div className="text-sm text-gray-500">Quick Action</div>
+          <div className="mt-1 text-lg font-semibold">New Workout</div>
+          <a href="/new-workout" className="btn btn-primary mt-3">Start Now</a>
+        </div>
+        <div className="card p-5">
+          <div className="text-sm text-gray-500">View</div>
+          <div className="mt-1 text-lg font-semibold">History</div>
+          <a href="/history" className="btn btn-ghost mt-3">Open</a>
+        </div>
+        <div className="card p-5">
+          <div className="text-sm text-gray-500">Insights</div>
+          <div className="mt-1 text-lg font-semibold">Analytics</div>
+          <a href="/analytics" className="btn btn-ghost mt-3">See charts</a>
         </div>
       </div>
 
-
-      <div className="max-w-3xl mx-auto space-y-6 px-6 pb-10">
-        {/* Profile card */}
-        <div className="rounded-xl p-6 bg-white shadow-md">
+      {/* Profile */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between">
           <div>
-            Signed in as <b>{me?.name}</b> ({me?.email})
-          </div>
-          <div className="text-sm text-gray-600 mt-1">
-            This confirms your login works.
-          </div>
-        </div>
-
-        {/* Exercises card */}
-        <div className="rounded-xl p-6 bg-white shadow-md space-y-4">
-          <h2 className="text-xl font-semibold">Exercises</h2>
-
-          <form onSubmit={addExercise} className="flex gap-2">
-            <input
-              className="flex-1 rounded px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="e.g., Bench Press"
-              value={newExercise}
-              onChange={(e) => setNewExercise(e.target.value)}
-            />
-            <button
-              className="rounded px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
-              disabled={saving}
-            >
-              {saving ? "Adding…" : "Add"}
-            </button>
-          </form>
-
-          {error && <div className="text-sm text-red-600">{error}</div>}
-
-          {exercises.length === 0 ? (
-            <div className="text-sm text-gray-600">
-              No exercises yet. Add one above.
+            <div>
+              Signed in as <b>{me?.name}</b> ({me?.email})
             </div>
-          ) : (
-            <ul className="list-disc ml-5 text-gray-800 text-base">
-              {exercises.map((ex) => (
-                <li key={ex.id}>{ex.name}</li>
-              ))}
-            </ul>
-          )}
+            <div className="text-sm text-gray-500 mt-1">
+              Welcome back! You’re logged in.
+            </div>
+          </div>
+          <button onClick={logout} className="btn btn-ghost">Logout</button>
         </div>
+      </div>
+
+      {/* Exercises */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Exercises</h2>
+          <span className="badge">{exercises.length} total</span>
+        </div>
+
+        <form onSubmit={addExercise} className="flex gap-2">
+          <input
+            className="input flex-1"
+            placeholder="e.g., Bench Press"
+            value={newExercise}
+            onChange={(e) => setNewExercise(e.target.value)}
+          />
+          <button className="btn btn-primary" disabled={saving}>
+            {saving ? "Adding…" : "Add"}
+          </button>
+        </form>
+
+        {error && <div className="text-sm text-red-600">{error}</div>}
+
+        {exercises.length === 0 ? (
+          <div className="text-sm text-gray-600">
+            No exercises yet. Add one above.
+          </div>
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {exercises.map((ex) => (
+              <li
+                key={ex.id}
+                className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3"
+              >
+                <div className="font-medium">{ex.name}</div>
+                {ex.muscles && ex.muscles.length > 0 && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    {ex.muscles.join(", ")}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

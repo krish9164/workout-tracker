@@ -3,9 +3,9 @@ import { api, clearToken, ApiError } from "../lib/api";
 
 type Workout = {
   id: number;
-  date: string;      // "YYYY-MM-DD"
+  date: string; // "YYYY-MM-DD"
   title: string;
-  sets_count?: number; // if your API returns it; otherwise we’ll compute
+  sets_count?: number;
   sets?: Array<{
     id: number;
     exercise_id: number;
@@ -20,6 +20,9 @@ export default function History() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // simple client-side search (by title or date)
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -39,21 +42,14 @@ export default function History() {
 
       try {
         const raw = await api("/workouts");
-        // 🔎 See exactly what the backend sends
-        console.log("GET /workouts raw response:", raw);
 
-        //  Normalize common shapes
+        // normalize common shapes
         const list: any[] = Array.isArray(raw)
           ? raw
-          : raw?.items ?? raw?.results ?? raw?.data ?? [];
+          : raw?.items ?? raw?.results ?? raw?.data ?? raw?.workouts ?? [];
 
-        // If backend returns an object with 'workouts' key
-        const normalized = Array.isArray(list) && list.length === 0 && Array.isArray(raw?.workouts)
-          ? raw.workouts
-          : list;
-
-        // sort newest first; fall back to created_at if date missing
-        const sorted = [...normalized].sort((a, b) => {
+        // newest first
+        const sorted = [...list].sort((a, b) => {
           const da = a.date || a.created_at || "";
           const db = b.date || b.created_at || "";
           return da < db ? 1 : -1;
@@ -75,68 +71,88 @@ export default function History() {
     load();
   }, []);
 
-  if (loading) return <div className="p-6 text-gray-800">Loading…</div>;
+  function niceDate(d: string) {
+    // avoid timezone shifts by pinning to midnight
+    const dt = new Date(`${d}T00:00:00`);
+    return isNaN(dt.getTime()) ? d : dt.toLocaleDateString();
+  }
+
+  if (loading) return <div className="p-6 text-gray-600">Loading…</div>;
+
+  // filter by query
+  const shown = workouts.filter((w) => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return (
+      (w.title || "").toLowerCase().includes(q) ||
+      (w.date || "").toLowerCase().includes(q)
+    );
+  });
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-900">
-      <div className="max-w-3xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">History</h1>
-          <div className="flex gap-2">
-            <a
-              href="/new-workout"
-              className="rounded px-3 py-2 bg-blue-600 text-white hover:bg-blue-700 transition"
-            >
-              + New Workout
-            </a>
-            <a
-              href="/"
-              className="rounded px-3 py-2 bg-gray-200 hover:bg-gray-300 transition"
-            >
-              ← Dashboard
-            </a>
-          </div>
+    <div className="space-y-6">
+      {/* Header row inside page content (shell handles the global header/sidebar) */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">History</h1>
+        <div className="flex gap-2">
+          <a href="/new-workout" className="btn btn-primary">+ New Workout</a>
         </div>
+      </div>
 
-        {/* Who's logged in */}
-        <div className="rounded-xl p-4 bg-white shadow-sm text-sm text-gray-700">
-          Signed in as <b>{me?.name}</b> ({me?.email})
-        </div>
+      {/* Who's logged in */}
+      <div className="card p-4 text-sm">
+        Signed in as <b>{me?.name}</b> ({me?.email})
+      </div>
 
-        {/* List */}
-        <div className="rounded-xl p-2 bg-white shadow-md">
-          {workouts.length === 0 ? (
-            <div className="p-6 text-gray-700">No workouts yet.</div>
-          ) : (
-            <ul>
-              {workouts.map((w) => {
-                const setsCount =
-                  typeof w.sets_count === "number"
-                    ? w.sets_count
-                    : Array.isArray(w.sets)
-                    ? w.sets.length
-                    : undefined;
-                return (
-                  <li key={w.id} className="border-b last:border-b-0 border-gray-200">
-                    <a
-                      href={`/workouts/${w.id}`}
-                      className="block p-4 hover:bg-gray-50 transition"
-                    >
-                      <div className="flex items-baseline justify-between">
-                        <div className="font-semibold">{w.title || "Workout"}</div>
-                        <div className="text-sm text-gray-600">{w.date}</div>
-                      </div>
-                      <div className="text-sm text-gray-700 mt-1">
-                        {setsCount != null ? `${setsCount} set${setsCount === 1 ? "" : "s"}` : "View details"}
-                      </div>
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+      {/* Search + count */}
+      <div className="card p-4 flex items-center justify-between gap-3">
+        <input
+          className="input max-w-sm"
+          placeholder="Search by title/date…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <div className="badge">{shown.length} workout{shown.length === 1 ? "" : "s"}</div>
+      </div>
+
+      {/* List */}
+      <div className="card p-0 overflow-hidden">
+        {error && <div className="p-4 text-red-600">{error}</div>}
+
+        {shown.length === 0 ? (
+          <div className="p-6 text-gray-600">No workouts found.</div>
+        ) : (
+          <ul>
+            {shown.map((w) => {
+              const setsCount =
+                typeof w.sets_count === "number"
+                  ? w.sets_count
+                  : Array.isArray(w.sets)
+                  ? w.sets.length
+                  : undefined;
+
+              return (
+                <li key={w.id} className="border-b last:border-b-0 border-gray-200 dark:border-gray-700">
+                  {/* ✅ route fix: singular "/workout/:id" */}
+                  <a
+                    href={`/workout/${w.id}`}
+                    className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                  >
+                    <div className="flex items-baseline justify-between">
+                      <div className="font-semibold">{w.title || "Workout"}</div>
+                      <div className="text-sm text-gray-600">{niceDate(w.date)}</div>
+                    </div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      {setsCount != null
+                        ? `${setsCount} set${setsCount === 1 ? "" : "s"}`
+                        : "View details"}
+                    </div>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );
