@@ -1,6 +1,7 @@
 // src/pages/Dashboard.tsx
 import { useEffect, useState } from "react";
 import { api, clearToken } from "../lib/api";
+import VoiceCapture from "../components/VoiceCapture";
 
 type Exercise = { id: number; name: string; muscles?: string[] | null };
 
@@ -62,6 +63,18 @@ export default function Dashboard() {
           <div className="mt-1 text-lg font-semibold">New Workout</div>
           <a href="/new-workout" className="btn btn-primary mt-3">Start Now</a>
         </div>
+      <div className="card p-5">
+        <div className="text-sm text-gray-500">Voice</div>
+        <div className="mt-1 text-lg font-semibold">Log by speech</div>
+        <div className="mt-3">
+          <VoiceCapture
+            onUploaded={(d) => {
+              alert(`Saved from transcript:\n\n${d.transcript}`);
+              window.location.href = `/workout/${d.workout.id}`;
+            }}
+          />
+        </div>
+      </div>
         <div className="card p-5">
           <div className="text-sm text-gray-500">View</div>
           <div className="mt-1 text-lg font-semibold">History</div>
