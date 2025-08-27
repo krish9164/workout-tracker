@@ -1,4 +1,9 @@
+# env files
 .env
 *.env
 backend/.env
 frontend/.env
+
+# dependencies
+node_modules/
+frontend/node_modules/
