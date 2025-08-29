@@ -205,3 +205,68 @@ def send_weekly_summary_now(
     if user.email:
         send_email(user.email, subject, body)
     return {"ok": True, "sent_to": user.email, "subject": subject}
+
+@router.get("/stats")
+def dashboard_stats(
+    threshold: int = Query(3, ge=1, le=14),
+    weeks: int = Query(26, ge=4, le=104),   # how far back to look for streaks
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns:
+    {
+      last_workout_date: "YYYY-MM-DD" | null,
+      this_week_start: "YYYY-MM-DD",
+      last_completed_week_start: "YYYY-MM-DD",
+      current_week_count: int,
+      last_week_count: int,
+      threshold: int,                        # sessions required per week
+      streak_weeks: int                      # consecutive completed weeks ≥ threshold (ending last week)
+    }
+    Notes:
+    - Weeks start on Monday (ISO).
+    - Streak counts fully completed weeks only (to avoid inflating mid-week).
+    """
+    today = date.today()
+    this_monday = today - timedelta(days=today.weekday())         # current week start
+    last_completed_week = this_monday - timedelta(weeks=1)        # last week's Monday
+    start_range = this_monday - timedelta(weeks=weeks - 1)
+    end_range = this_monday + timedelta(days=6)                   # include current week through Sunday
+
+    q = (
+        select(Workout)
+        .where(
+            Workout.user_id == user.id,
+            Workout.date >= start_range,
+            Workout.date <= end_range,
+        )
+        .order_by(Workout.date.asc())
+    )
+    workouts = db.execute(q).scalars().all()
+
+    last_workout_date = max((w.date for w in workouts), default=None)
+
+    # Count sessions per ISO week (Mon start)
+    per_week = defaultdict(int)
+    for w in workouts:
+        wk_start = w.date - timedelta(days=w.date.weekday())
+        per_week[wk_start] += 1
+
+    # Streak over *completed* weeks (ending last week), walking backwards
+    streak = 0
+    wk = last_completed_week
+    while per_week.get(wk, 0) >= threshold:
+        streak += 1
+        wk = wk - timedelta(weeks=1)
+
+    out = {
+        "last_workout_date": last_workout_date.isoformat() if last_workout_date else None,
+        "this_week_start": this_monday.isoformat(),
+        "last_completed_week_start": last_completed_week.isoformat(),
+        "current_week_count": per_week.get(this_monday, 0),
+        "last_week_count": per_week.get(last_completed_week, 0),
+        "threshold": threshold,
+        "streak_weeks": streak,
+    }
+    return out
