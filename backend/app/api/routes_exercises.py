@@ -1,12 +1,13 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.models.exercise import Exercise
 from app.schemas.exercise import ExerciseIn, ExerciseOut, ExerciseUpdate
 from app.models.user import User
+from app.models.workout import SetEntry
 
 router = APIRouter()
 
@@ -45,8 +46,18 @@ def update_exercise(exercise_id: int, data: ExerciseUpdate, user: User = Depends
 @router.delete("/{exercise_id}", status_code=204)
 def delete_exercise(exercise_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     ex = db.get(Exercise, exercise_id)
-    if not ex or (ex.user_id is not None and ex.user_id != user.id):
+    if not ex:
         return
+    # Only allow deletion of user-owned custom exercises
+    if ex.user_id != user.id:
+        # deny deleting global or another user's exercise
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot delete this exercise")
+
+    # Optional: block delete if exercise is used by any sets
+    used_count = db.scalar(select(func.count()).select_from(SetEntry).where(SetEntry.exercise_id == ex.id)) or 0
+    if used_count > 0:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exercise is used in workouts")
+
     db.delete(ex)
     db.commit()
     return

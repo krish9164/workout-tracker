@@ -3,7 +3,13 @@ import { useEffect, useState } from "react";
 import { api, clearToken } from "../lib/api";
 import VoiceCapture from "../components/VoiceCapture";
 
-type Exercise = { id: number; name: string; muscles?: string[] | null };
+type Exercise = {
+  id: number;
+  name: string;
+  muscles?: string[] | null;
+  is_custom?: boolean;
+  user_id?: number | null;
+};
 
 export default function Dashboard() {
   const [me, setMe] = useState<any>(null);
@@ -47,6 +53,17 @@ export default function Dashboard() {
     }
   }
 
+  async function removeExercise(id: number) {
+    if (!confirm("Delete this exercise? This cannot be undone.")) return;
+    setError(null);
+    try {
+      await api(`/exercises/${id}`, { method: "DELETE" });
+      setExercises((prev) => prev.filter((e) => e.id !== id));
+    } catch (err: any) {
+      setError(err?.message || "Failed to delete exercise");
+    }
+  }
+
   function logout() {
     clearToken();
     window.location.href = "/login";
@@ -63,23 +80,26 @@ export default function Dashboard() {
           <div className="mt-1 text-lg font-semibold">New Workout</div>
           <a href="/new-workout" className="btn btn-primary mt-3">Start Now</a>
         </div>
-      <div className="card p-5">
-        <div className="text-sm text-gray-500">Voice</div>
-        <div className="mt-1 text-lg font-semibold">Log by speech</div>
-        <div className="mt-3">
-          <VoiceCapture
-            onUploaded={(d) => {
-              alert(`Saved from transcript:\n\n${d.transcript}`);
-              window.location.href = `/workout/${d.workout.id}`;
-            }}
-          />
+
+        <div className="card p-5">
+          <div className="text-sm text-gray-500">Voice</div>
+          <div className="mt-1 text-lg font-semibold">Log by speech</div>
+          <div className="mt-3">
+            <VoiceCapture
+              onUploaded={(d) => {
+                alert(`Saved from transcript:\n\n${d.transcript}`);
+                window.location.href = `/workout/${d.workout.id}`;
+              }}
+            />
+          </div>
         </div>
-      </div>
+
         <div className="card p-5">
           <div className="text-sm text-gray-500">View</div>
           <div className="mt-1 text-lg font-semibold">History</div>
           <a href="/history" className="btn btn-ghost mt-3">Open</a>
         </div>
+
         <div className="card p-5">
           <div className="text-sm text-gray-500">Insights</div>
           <div className="mt-1 text-lg font-semibold">Analytics</div>
@@ -132,13 +152,35 @@ export default function Dashboard() {
             {exercises.map((ex) => (
               <li
                 key={ex.id}
-                className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3"
+                className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 flex items-start justify-between gap-3"
               >
-                <div className="font-medium">{ex.name}</div>
-                {ex.muscles && ex.muscles.length > 0 && (
-                  <div className="mt-1 text-xs text-gray-500">
-                    {ex.muscles.join(", ")}
+                <div>
+                  <div className="font-medium">{ex.name}</div>
+                  {ex.muscles && ex.muscles.length > 0 && (
+                    <div className="mt-1 text-xs text-gray-500">
+                      {ex.muscles.join(", ")}
+                    </div>
+                  )}
+                  <div className="mt-1 text-[10px] uppercase tracking-wide text-gray-500">
+                    {ex.is_custom ? "Custom" : "Global"}
                   </div>
+                </div>
+
+                {ex.is_custom ? (
+                  <button
+                    className="btn btn-ghost text-red-600"
+                    onClick={() => removeExercise(ex.id)}
+                    title="Delete exercise"
+                  >
+                    Delete
+                  </button>
+                ) : (
+                  <span
+                    className="text-xs text-gray-400 self-center"
+                    title="Global exercises cannot be deleted"
+                  >
+                    •
+                  </span>
                 )}
               </li>
             ))}

@@ -8,6 +8,13 @@ from app.api.deps import get_current_user, get_db
 from app.models.user import User
 from app.models.workout import Workout, SetEntry
 
+from datetime import date, timedelta
+from zoneinfo import ZoneInfo
+from app.services.stats import compute_weekly_stats, week_bounds
+from app.services.summarize import summarize_week
+from app.services.mailer import send_email
+from app.core.config import settings
+
 router = APIRouter()
 
 @router.get("/max-weight")
@@ -167,3 +174,34 @@ def daily_volume(
         {"date": d.isoformat(), "volume": day_map[d]}
         for d in sorted(day_map.keys())
     ]
+
+@router.get("/weekly-summary")
+def weekly_summary_preview(
+    week_start: date | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # default to current week's Monday
+    today = date.today()
+    this_mon = today - timedelta(days=today.weekday())
+    ws = week_start or this_mon
+    stats = compute_weekly_stats(db, user.id, ws)
+    summary = summarize_week(stats)
+    return {"stats": stats, "summary": summary}
+
+@router.post("/send-weekly-summary")
+def send_weekly_summary_now(
+    week_start: date | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    today = date.today()
+    this_mon = today - timedelta(days=today.weekday())
+    ws = week_start or this_mon
+    stats = compute_weekly_stats(db, user.id, ws)
+    summary = summarize_week(stats)
+    subject = f"Your Weekly Training Recap • Week of {stats['week_start']}"
+    body = f"{summary}\n\n— Workout Tracker"
+    if user.email:
+        send_email(user.email, subject, body)
+    return {"ok": True, "sent_to": user.email, "subject": subject}

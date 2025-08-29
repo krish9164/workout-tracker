@@ -1,3 +1,4 @@
+// src/pages/Analytics.tsx
 import { useEffect, useState } from "react";
 import { api, ApiError, clearToken } from "../lib/api";
 import {
@@ -22,6 +23,13 @@ export default function Analytics() {
 
   const [maxw, setMaxW] = useState<MaxW[]>([]);
   const [maxwLoading, setMaxWLoading] = useState(true);
+
+  // Weekly recap (LLM) states
+  const [recap, setRecap] = useState<string | null>(null);
+  const [recapStats, setRecapStats] = useState<any | null>(null);
+  const [recapLoading, setRecapLoading] = useState(false);
+  const [recapErr, setRecapErr] = useState<string | null>(null);
+  const [recapSentMsg, setRecapSentMsg] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +60,51 @@ export default function Analytics() {
       setDailyLoading(false);
       setWeeklyLoading(false);
       setMaxWLoading(false);
+    }
+  }
+
+  async function previewWeeklyRecap() {
+    setRecapErr(null);
+    setRecapSentMsg(null);
+    setRecapLoading(true);
+    try {
+      const data = await api("/analytics/weekly-summary");
+      setRecap(data?.summary || "");
+      setRecapStats(data?.stats || null);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearToken();
+        window.location.href = "/login";
+        return;
+      }
+      setRecapErr("Failed to load weekly recap.");
+    } finally {
+      setRecapLoading(false);
+    }
+  }
+
+  async function sendWeeklyRecap() {
+    setRecapErr(null);
+    setRecapSentMsg(null);
+    setRecapLoading(true);
+    try {
+      const sent = await api("/analytics/send-weekly-summary", { method: "POST" });
+      setRecapSentMsg(`Sent to ${sent?.sent_to || me?.email || "your email"}.`);
+      // If we don't have a preview yet, fetch it now so the user can also read it on-screen.
+      if (!recap) {
+        const data = await api("/analytics/weekly-summary");
+        setRecap(data?.summary || "");
+        setRecapStats(data?.stats || null);
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearToken();
+        window.location.href = "/login";
+        return;
+      }
+      setRecapErr("Failed to send weekly recap email.");
+    } finally {
+      setRecapLoading(false);
     }
   }
 
@@ -155,37 +208,87 @@ export default function Analytics() {
           </div>
         </div>
 
-        {/* Personal Records */}
         {/* Heaviest Weight per Exercise */}
-<div className="rounded-xl p-4 bg-white shadow-md space-y-3">
-  <h2 className="text-xl font-semibold">Heaviest Weight per Exercise</h2>
-  <div style={{ height: 360 }}>
-    {maxwLoading ? (
-      <div className="p-2 text-gray-600">Loading…</div>
-    ) : (
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={maxw} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis
-            dataKey="exercise_name"
-            angle={-20}
-            textAnchor="end"
-            interval={0}
-            tick={{ fontSize: 12 }}
-          />
-          <YAxis tick={{ fontSize: 12 }} />
-          <Tooltip />
-          <Legend />
-          <Bar dataKey="max_weight" name="Max weight (kg)" />
-        </BarChart>
-      </ResponsiveContainer>
-    )}
-  </div>
-  <div className="text-xs text-gray-600">
-    Shows your single heaviest set for each exercise (kg).
-  </div>
-</div>
+        <div className="rounded-xl p-4 bg-white shadow-md space-y-3">
+          <h2 className="text-xl font-semibold">Heaviest Weight per Exercise</h2>
+          <div style={{ height: 360 }}>
+            {maxwLoading ? (
+              <div className="p-2 text-gray-600">Loading…</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={maxw} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="exercise_name"
+                    angle={-20}
+                    textAnchor="end"
+                    interval={0}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="max_weight" name="Max weight (kg)" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+          <div className="text-xs text-gray-600">
+            Shows your single heaviest set for each exercise (kg).
+          </div>
+        </div>
 
+        {/* Weekly Recap (LLM summary + email) */}
+        <div className="rounded-xl p-4 bg-white shadow-md space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Weekly Recap</h2>
+            <div className="flex gap-2">
+              <button
+                className="btn btn-ghost"
+                onClick={previewWeeklyRecap}
+                disabled={recapLoading}
+                title="Generate a short motivational summary of your week"
+              >
+                {recapLoading ? "Loading…" : "Preview recap"}
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={sendWeeklyRecap}
+                disabled={recapLoading}
+                title="Email this week's recap to your inbox"
+              >
+                {recapLoading ? "Sending…" : "Email me now"}
+              </button>
+            </div>
+          </div>
+
+          {recapErr && (
+            <div className="rounded-md p-3 bg-red-50 text-red-700 text-sm">{recapErr}</div>
+          )}
+          {recapSentMsg && (
+            <div className="rounded-md p-3 bg-green-50 text-green-700 text-sm">{recapSentMsg}</div>
+          )}
+
+          {recap ? (
+            <div className="space-y-3">
+              <div className="whitespace-pre-wrap text-sm leading-6">{recap}</div>
+              {recapStats && (
+                <div className="text-xs text-gray-600">
+                  <div>Week: {recapStats.week_start} → {recapStats.week_end}</div>
+                  <div>Days trained: {recapStats.days_trained} • Workouts: {recapStats.workouts} • Sets: {recapStats.total_sets}</div>
+                  <div>Total volume: {recapStats.total_volume} (Δ vs last week: {recapStats.volume_change_vs_last_week >= 0 ? "+" : ""}{recapStats.volume_change_vs_last_week})</div>
+                  {recapStats.missed_groups?.length > 0 && (
+                    <div>Missed groups: {recapStats.missed_groups.join(", ")}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-600">
+              Generate a short motivational summary of your current week and optionally send it to your email.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
